@@ -1,0 +1,657 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>フラワー長井線 運転シミュレーター</title>
+<style>
+:root {
+  --bg: #050505;
+  --cab: #171819;
+  --cab-2: #242627;
+  --metal: #4b4f51;
+  --line: #747a7d;
+  --text: #f3f1e8;
+  --muted: #a8a396;
+  --green: #38f27f;
+  --amber: #f7bd38;
+  --red: #f05b4f;
+  --blue: #4fc3ff;
+  --glass: rgba(8, 10, 12, 0.68);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif; }
+button, input { font: inherit; }
+#app { position: relative; width: 100vw; height: 100dvh; background: #000; }
+
+#view {
+  position: absolute;
+  top: 104px;
+  left: clamp(34px, 7.5vw, 106px);
+  right: clamp(34px, 7.5vw, 106px);
+  bottom: clamp(170px, 27vh, 256px);
+  display: grid;
+  place-items: center;
+  background: #000;
+  overflow: hidden;
+}
+#main-video {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  background: #000;
+}
+
+#cab {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.post { position: absolute; top: 0; bottom: 0; width: clamp(44px, 14vw, 210px); background: linear-gradient(90deg, #111, var(--cab)); border-color: var(--line); }
+#left-post { left: 0; border-right: 2px solid var(--line); }
+#right-post { right: 0; border-left: 2px solid var(--line); background: linear-gradient(270deg, #111, var(--cab)); }
+#roof { position: absolute; top: 0; left: 0; right: 0; height: clamp(42px, 10vh, 92px); background: linear-gradient(#090909, var(--cab)); border-bottom: 2px solid var(--line); }
+#desk { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(138px, 25vh, 240px); background: linear-gradient(#202223, #111); border-top: 2px solid var(--line); box-shadow: 0 -22px 42px rgba(0,0,0,0.55); }
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: clamp(54px, 15vw, 222px);
+  right: clamp(54px, 15vw, 222px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+  z-index: 10;
+}
+.hud-card {
+  background: var(--glass);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(8px);
+}
+#speed-card { min-width: 126px; display: flex; align-items: baseline; gap: 5px; justify-content: center; }
+#speed { font-family: Consolas, "Share Tech Mono", monospace; color: var(--green); font-size: clamp(34px, 5vw, 56px); line-height: 1; min-width: 2.2em; text-align: right; }
+#speed-unit { color: var(--muted); font-size: 12px; }
+#route-card { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; min-width: 0; }
+.station-name { font-size: clamp(13px, 2vw, 18px); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; }
+#route-arrow { color: var(--amber); font-size: 18px; }
+#status-card { display: grid; align-content: center; min-width: 118px; }
+#status-main { color: var(--amber); font-weight: 700; }
+#status-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+#station-plate {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(150px, 27vh, 258px);
+  width: min(760px, 68vw);
+  height: min(330px, 44vh);
+  transform: translate(-50%, 18px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 12;
+  background: rgba(12, 16, 18, 0.58);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 22px 60px rgba(0,0,0,0.5);
+  transition: opacity .35s ease, transform .35s ease;
+}
+#station-plate.visible { opacity: 1; transform: translate(-50%, 0); }
+#plate-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px 10px;
+  background: linear-gradient(rgba(255,255,255,0.09), rgba(255,255,255,0.02));
+  border-bottom: 1px solid rgba(255,255,255,0.16);
+}
+#plate-title { color: var(--amber); font-size: clamp(22px, 3.6vw, 34px); font-weight: 800; letter-spacing: .04em; }
+#plate-kana { color: var(--muted); font-size: 13px; }
+#plate-body { position: relative; height: calc(100% - 68px); overflow: hidden; }
+#plate-scroll { position: absolute; left: 0; right: 0; top: 100%; padding: 16px 22px 30px; line-height: 1.75; animation: scrollInfo 24s linear infinite; }
+#station-plate.visible #plate-scroll { animation-play-state: running; }
+.plate-section { margin-bottom: 18px; }
+.plate-section h3 { margin: 0 0 7px; color: var(--green); font-size: 13px; letter-spacing: .12em; }
+.plate-section p, .plate-section li { color: var(--text); font-size: clamp(13px, 1.7vw, 16px); }
+.plate-section ul { padding-left: 1.2em; margin: 0; }
+@keyframes scrollInfo { from { top: 100%; } to { top: -145%; } }
+
+#controls {
+  position: absolute;
+  left: clamp(18px, 15vw, 226px);
+  right: clamp(18px, 15vw, 226px);
+  bottom: 16px;
+  height: clamp(110px, 20vh, 192px);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(220px, 1.35fr) minmax(150px, 1fr);
+  gap: 14px;
+}
+.console {
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.24));
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+.console-title { color: var(--muted); font-size: 12px; letter-spacing: .12em; margin-bottom: 8px; }
+.lever-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.lever {
+  width: clamp(34px, 4.2vw, 52px);
+  height: clamp(34px, 4.2vw, 52px);
+  border: 1px solid var(--metal);
+  border-radius: 8px;
+  color: var(--text);
+  background: #222527;
+  cursor: pointer;
+}
+.lever.active.power { border-color: var(--green); color: var(--green); background: rgba(56,242,127,0.12); box-shadow: inset 0 0 0 1px rgba(56,242,127,0.2); }
+.lever.active.brake { border-color: var(--red); color: var(--red); background: rgba(240,91,79,0.12); box-shadow: inset 0 0 0 1px rgba(240,91,79,0.2); }
+.wide { width: auto; min-width: 56px; padding: 0 10px; }
+
+#meters { display: grid; gap: 8px; }
+.meter { display: grid; grid-template-columns: 64px 1fr 48px; gap: 8px; align-items: center; }
+.meter-name, .meter-value { color: var(--muted); font-size: 12px; }
+.meter-value { text-align: right; font-family: Consolas, monospace; }
+.bar { height: 9px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; }
+.fill { height: 100%; width: 0%; border-radius: inherit; transition: width .18s ease; }
+#power-fill { background: var(--blue); }
+#brake-fill { background: var(--red); }
+#rpm-fill { background: var(--green); }
+#progress-fill { background: var(--amber); }
+
+#switches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.switch {
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 7px;
+  background: rgba(0,0,0,0.2);
+  color: var(--text);
+  padding: 8px;
+  cursor: pointer;
+}
+.switch.on { border-color: var(--green); color: var(--green); }
+
+#start {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(54,64,68,.8), rgba(0,0,0,.96) 58%);
+}
+#start-panel {
+  width: min(560px, calc(100vw - 32px));
+  background: rgba(9, 12, 14, 0.86);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+}
+#start-panel h1 { margin: 0 0 6px; color: var(--amber); font-size: clamp(26px, 5vw, 42px); letter-spacing: .08em; }
+#start-panel p { color: var(--muted); margin: 8px 0 18px; line-height: 1.7; }
+#start-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+#start button, .file-label {
+  border: 1px solid var(--amber);
+  background: rgba(247,189,56,0.09);
+  color: var(--amber);
+  border-radius: 7px;
+  padding: 11px 18px;
+  cursor: pointer;
+}
+#video-file { display: none; }
+#help { margin-top: 14px; text-align: left; color: var(--muted); font-size: 13px; }
+#help kbd { display: inline-block; min-width: 24px; padding: 2px 5px; border: 1px solid rgba(255,255,255,.24); border-radius: 4px; color: var(--text); text-align: center; background: rgba(255,255,255,.06); }
+
+#toast {
+  position: absolute;
+  top: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: rgba(0,0,0,.7);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 7px;
+  padding: 8px 14px;
+  color: var(--text);
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+#toast.visible { opacity: 1; }
+
+@media (max-width: 760px) {
+  #hud { left: 10px; right: 10px; grid-template-columns: auto 1fr; }
+  #status-card { display: none; }
+  #route-card { grid-column: 1 / -1; }
+  #station-plate { width: calc(100vw - 28px); bottom: 178px; height: 38vh; }
+  #controls { left: 10px; right: 10px; height: 164px; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #center-console { grid-column: 1 / -1; order: -1; }
+  .console { padding: 8px; }
+  .post { width: 22px; }
+  #view {
+    top: 106px;
+    left: 22px;
+    right: 22px;
+    bottom: 180px;
+  }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view">
+    <video id="main-video" src="akayu_arato_constant_speed_mobile.mp4" preload="auto" playsinline></video>
+  </div>
+
+  <div id="cab" aria-hidden="true">
+    <div id="roof"></div>
+    <div class="post" id="left-post"></div>
+    <div class="post" id="right-post"></div>
+    <div id="desk"></div>
+  </div>
+
+  <div id="hud">
+    <div class="hud-card" id="speed-card"><div id="speed">0</div><div id="speed-unit">km/h</div></div>
+    <div class="hud-card" id="route-card">
+      <div><div class="label">現在</div><div class="station-name" id="current-station">赤湯</div></div>
+      <div id="route-arrow">→</div>
+      <div><div class="label">次駅</div><div class="station-name" id="next-station">南陽市役所</div></div>
+    </div>
+    <div class="hud-card" id="status-card">
+      <div class="label">運転状態</div>
+      <div id="status-main">停車中</div>
+      <div id="status-sub">発車準備</div>
+    </div>
+  </div>
+
+  <div id="station-plate">
+    <div id="plate-head">
+      <div>
+        <div id="plate-title">赤湯</div>
+        <div id="plate-kana">あかゆ</div>
+      </div>
+      <div class="label" id="plate-stop-time">停車 33秒</div>
+    </div>
+    <div id="plate-body"><div id="plate-scroll"></div></div>
+  </div>
+
+  <div id="controls">
+    <div class="console">
+      <div class="console-title">力行レバー</div>
+      <div class="lever-row">
+        <button class="lever wide" data-power="0">切</button>
+        <button class="lever" data-power="1">1</button>
+        <button class="lever" data-power="2">2</button>
+        <button class="lever" data-power="3">3</button>
+        <button class="lever" data-power="4">4</button>
+        <button class="lever" data-power="5">5</button>
+      </div>
+    </div>
+
+    <div class="console" id="center-console">
+      <div id="meters">
+        <div class="meter"><div class="meter-name">出力</div><div class="bar"><div class="fill" id="power-fill"></div></div><div class="meter-value" id="power-value">0%</div></div>
+        <div class="meter"><div class="meter-name">制動</div><div class="bar"><div class="fill" id="brake-fill"></div></div><div class="meter-value" id="brake-value">0%</div></div>
+        <div class="meter"><div class="meter-name">回転</div><div class="bar"><div class="fill" id="rpm-fill"></div></div><div class="meter-value" id="rpm-value">650</div></div>
+        <div class="meter"><div class="meter-name">行程</div><div class="bar"><div class="fill" id="progress-fill"></div></div><div class="meter-value" id="time-value">0:00</div></div>
+      </div>
+      <div id="switches">
+        <button class="switch on" id="auto-stop">自動停車 ON</button>
+        <button class="switch on" id="info-switch">駅情報 ON</button>
+      </div>
+    </div>
+
+    <div class="console">
+      <div class="console-title">ブレーキ</div>
+      <div class="lever-row">
+        <button class="lever wide" data-brake="0">緩解</button>
+        <button class="lever" data-brake="1">1</button>
+        <button class="lever" data-brake="2">2</button>
+        <button class="lever" data-brake="3">3</button>
+        <button class="lever" data-brake="4">EB</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<div id="start">
+  <div id="start-panel">
+    <h1>フラワー長井線</h1>
+    <p>赤湯から荒砥まで、運転席の窓越しに前面展望動画を見ながら走行します。力行とブレーキを操作して、各駅では周辺情報プレートが下から上へ流れます。</p>
+    <div id="start-actions">
+      <button id="start-run">運転開始</button>
+      <label class="file-label" for="video-file">動画を変更</label>
+      <input id="video-file" type="file" accept="video/*">
+    </div>
+    <div id="help">
+      <div><kbd>↑</kbd> 力行を上げる　<kbd>↓</kbd> ブレーキを上げる　<kbd>Space</kbd> ノッチオフ/緩解</div>
+      <div>停車中はブレーキを緩解し、力行を入れると早めに発車できます。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById("main-video");
+const stations = [
+  { name:"赤湯", kana:"あかゆ", arrival:0, stop:33, info:"JR奥羽本線・山形新幹線との接続駅。温泉地として知られ、フラワー長井線の旅の起点です。", spots:["赤湯温泉街", "烏帽子山公園", "南陽のワイン"] },
+  { name:"南陽市役所", kana:"なんようしやくしょ", arrival:76, stop:18, info:"市役所に近い駅で、赤湯市街地から宮内方面へ進む区間の入口です。", spots:["南陽市役所", "赤湯温泉周辺", "市街地散策"] },
+  { name:"宮内", kana:"みやうち", arrival:178, stop:59, info:"熊野大社の門前町として知られるエリア。沿線でも生活感のある大きな駅です。", spots:["熊野大社", "双松公園", "宮内商店街"] },
+  { name:"おりはた", kana:"おりはた", arrival:221, stop:15, info:"田園と集落の景色が広がる静かな駅。車窓には置賜盆地らしい風景が続きます。", spots:["田園風景", "里山の眺め"] },
+  { name:"梨郷", kana:"りんごう", arrival:260, stop:3, info:"短い停車で通過感のある小駅。沿線の農地と集落の距離感が近い区間です。", spots:["果樹園", "置賜盆地の田園"] },
+  { name:"西大塚", kana:"にしおおつか", arrival:325, stop:4, info:"素朴な木造駅舎が印象的な駅。ローカル線らしい佇まいを楽しめます。", spots:["歴史ある駅舎", "農村風景"] },
+  { name:"今泉", kana:"いまいずみ", arrival:378, stop:11, info:"JR米坂線との接続駅。長井線の中でも交通の節点となる場所です。", spots:["JR米坂線接続", "白川周辺", "駅前散策"] },
+  { name:"時庭", kana:"ときにわ", arrival:594, stop:34, info:"長井市南部の田園地帯にある駅。穏やかな直線区間の風景が続きます。", spots:["田園風景", "最上川水系の眺め"] },
+  { name:"南長井", kana:"みなみながい", arrival:810, stop:99, info:"長井市街地の南側に位置し、住宅地と田畑が混ざる風景に変わっていきます。", spots:["長井市街地南部", "水路のある町並み"] },
+  { name:"長井", kana:"ながい", arrival:834, stop:18, info:"フラワー長井線の中心駅。長井市の観光や街歩きの拠点になります。", spots:["長井市中心部", "長井あやめ公園", "けん玉文化"] },
+  { name:"あやめ公園", kana:"あやめこうえん", arrival:853, stop:2, info:"あやめ公園の最寄り駅。季節には花の名所として知られます。", spots:["長井あやめ公園", "花の散策路"] },
+  { name:"羽前成田", kana:"うぜんなりた", arrival:886, stop:3, info:"長井市北部の集落にある駅。沿線の暮らしを近くに感じる区間です。", spots:["成田地区", "田園と住宅地"] },
+  { name:"白兎", kana:"しろうさぎ", arrival:928, stop:4, info:"名前が印象的な駅。周辺は静かな田園地帯で、車窓の開放感があります。", spots:["白兎地区", "田園風景"] },
+  { name:"蚕桑", kana:"こぐわ", arrival:966, stop:4, info:"白鷹町へ近づく区間の駅。山並みが近くなり、景色の表情が変わります。", spots:["白鷹町の田園", "里山の景色"] },
+  { name:"鮎貝", kana:"あゆかい", arrival:1055, stop:10, info:"最上川に近い白鷹町の駅。終点荒砥へ向けて、川と山の気配が濃くなります。", spots:["鮎貝地区", "最上川周辺"] },
+  { name:"四季の郷", kana:"しきのさと", arrival:1088, stop:10, info:"名前どおり季節感のある風景が楽しめる駅。終点まであと少しです。", spots:["四季の郷周辺", "白鷹町の自然"] },
+  { name:"荒砥", kana:"あらと", arrival:1209, stop:60, info:"フラワー長井線の終点。白鷹町の中心部に近く、旅の終着駅です。", spots:["白鷹町中心部", "最上川", "荒砥駅前"] }
+];
+
+let power = 0;
+let brake = 0;
+let rpm = 650;
+let speed = 0;
+let timingScale = 1;
+let autoStop = true;
+let infoOn = true;
+let stopping = false;
+let stopUntil = 0;
+let stoppedIndex = new Set();
+let currentIndex = 0;
+let stopIndex = 0;
+let audioReady = false;
+let audioCtx, engineOsc, engineGain;
+let lastVideoClock = 0;
+let videoStallTime = 0;
+let lastStallNudge = 0;
+
+const el = id => document.getElementById(id);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const fmt = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+
+function stationArrival(station) {
+  return station.arrival * timingScale + (station.offset || 0);
+}
+
+function toast(text) {
+  const t = el("toast");
+  t.textContent = text;
+  t.classList.add("visible");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove("visible"), 1800);
+}
+
+function setPower(n) {
+  power = n;
+  if (n > 0) brake = 0;
+  updateButtons();
+  if (stopping && n > 0 && brake === 0) depart();
+}
+
+function setBrake(n) {
+  brake = n;
+  if (n > 0) power = 0;
+  updateButtons();
+}
+
+function updateButtons() {
+  document.querySelectorAll("[data-power]").forEach(btn => btn.classList.toggle("active", Number(btn.dataset.power) === power));
+  document.querySelectorAll("[data-brake]").forEach(btn => btn.classList.toggle("active", Number(btn.dataset.brake) === brake));
+}
+
+function showStation(station) {
+  el("plate-title").textContent = station.name;
+  el("plate-kana").textContent = station.kana;
+  el("plate-stop-time").textContent = `停車 ${station.stop}秒`;
+  el("plate-scroll").innerHTML = `
+    <div class="plate-section"><h3>駅周辺情報</h3><p>${station.info}</p></div>
+    <div class="plate-section"><h3>見どころ</h3><ul>${station.spots.map(s => `<li>${s}</li>`).join("")}</ul></div>
+    <div class="plate-section"><h3>運転メモ</h3><p>発車時はブレーキを緩解し、力行1からゆっくり加速してください。停車中は速度計が0km/hになります。</p></div>
+  `;
+  el("station-plate").classList.toggle("visible", infoOn);
+}
+
+function hideStation() {
+  el("station-plate").classList.remove("visible");
+}
+
+function triggerStop(index) {
+  const station = stations[index];
+  const targetTime = stationArrival(station);
+  const correction = video.currentTime - targetTime;
+  if (Number.isFinite(targetTime) && Math.abs(correction) > 0.08 && index > 0) {
+    video.currentTime = clamp(targetTime, 0, video.duration || targetTime);
+  }
+  stopping = true;
+  stopUntil = performance.now() + station.stop * 1000;
+  stoppedIndex.add(index);
+  currentIndex = index;
+  stopIndex = index;
+  speed = 0;
+  video.pause();
+  video.playbackRate = 1;
+  lastVideoClock = video.currentTime;
+  videoStallTime = 0;
+  setBrake(Math.max(brake, 1));
+  showStation(station);
+  el("status-main").textContent = "停車中";
+  toast(Math.abs(correction) > 0.08 && index > 0
+    ? `${station.name}に停車。位置を${Math.abs(correction).toFixed(1)}秒自動補正`
+    : `${station.name}に停車`);
+}
+
+function depart() {
+  const departIndex = stopping ? stopIndex : currentIndex;
+  const station = stations[departIndex];
+  const nextStation = stations[departIndex + 1];
+  const nextArrival = nextStation ? stationArrival(nextStation) : Infinity;
+  const departureTime = Math.min(stationArrival(station) + 1.2, nextArrival - 1.0);
+  if (Number.isFinite(departureTime) && Number.isFinite(video.duration) && video.currentTime < departureTime - 0.25) {
+    video.currentTime = clamp(departureTime, 0, video.duration);
+  }
+  stopping = false;
+  currentIndex = departIndex;
+  hideStation();
+  el("status-main").textContent = "走行中";
+  lastVideoClock = video.currentTime;
+  videoStallTime = 0;
+  video.play().catch(() => {});
+  toast("発車");
+}
+
+function updateRoute() {
+  let idx = stopping ? stopIndex : 0;
+  if (!stopping) {
+    for (let i = 0; i < stations.length; i++) {
+      if (video.currentTime >= stationArrival(stations[i])) idx = i;
+    }
+  }
+  currentIndex = idx;
+  const next = stations.find((s, i) => i > idx && !stoppedIndex.has(i));
+  el("current-station").textContent = stations[idx].name;
+  el("next-station").textContent = next ? next.name : "終点 到着";
+}
+
+function updateMotion(dt) {
+  if (stopping) {
+    speed = 0;
+    const remain = Math.max(0, Math.ceil((stopUntil - performance.now()) / 1000));
+    el("status-sub").textContent = remain > 0 ? `発車まで ${remain}秒` : "発車可";
+    if (performance.now() >= stopUntil && brake === 0) depart();
+    return;
+  }
+
+  const accel = power * 3.2 - brake * 6.5 - 0.35;
+  speed = clamp(speed + accel * dt, 0, 80);
+  if (brake >= 4) speed = clamp(speed - 18 * dt, 0, 80);
+  const rateFromSpeed = speed > 1 ? clamp(speed / 40, 0.45, 2.2) : 0.12;
+  video.playbackRate = speed > 1 ? rateFromSpeed : 0.12;
+  if (speed < 0.5 && power === 0 && brake === 0) video.pause();
+  else if (video.paused) video.play().catch(() => {});
+  driveVideoIfStalled(dt, rateFromSpeed);
+
+  el("status-main").textContent = brake > 0 ? "制動中" : power > 0 ? "力行中" : "惰行中";
+  el("status-sub").textContent = `ノッチ ${power} / ブレーキ ${brake}`;
+
+  if (autoStop) {
+    for (let i = 0; i < stations.length; i++) {
+      const s = stations[i];
+      if (!stoppedIndex.has(i) && video.currentTime >= stationArrival(s)) {
+        triggerStop(i);
+        break;
+      }
+    }
+  }
+}
+
+function driveVideoIfStalled(dt, targetRate) {
+  if (stopping || speed <= 1 || !Number.isFinite(video.duration)) {
+    lastVideoClock = video.currentTime;
+    videoStallTime = 0;
+    return;
+  }
+
+  const delta = video.currentTime - lastVideoClock;
+  if (delta < -0.25) {
+    video.currentTime = clamp(lastVideoClock, 0, video.duration);
+    return;
+  }
+
+  if (!video.paused && delta > 0.01) {
+    videoStallTime = 0;
+    lastStallNudge = 0;
+    lastVideoClock = video.currentTime;
+    return;
+  }
+
+  videoStallTime += dt;
+  if (videoStallTime > 0.18) {
+    if (video.paused) video.play().catch(() => {});
+  }
+  if (videoStallTime > 0.35 && video.readyState >= 1) {
+    lastStallNudge += dt;
+    if (lastStallNudge > 0.18) {
+      video.currentTime = clamp(video.currentTime + Math.max(0.12, targetRate * dt * 2), 0, video.duration);
+      lastStallNudge = 0;
+    }
+  }
+  lastVideoClock = video.currentTime;
+}
+
+function updateMeters() {
+  const duration = video.duration || stations[stations.length - 1].arrival;
+  rpm += ((650 + speed * 18 + power * 110) - rpm) * 0.08;
+  el("speed").textContent = Math.round(speed);
+  el("power-fill").style.width = `${power / 5 * 100}%`;
+  el("brake-fill").style.width = `${brake / 4 * 100}%`;
+  el("rpm-fill").style.width = `${clamp((rpm - 600) / 1600 * 100, 0, 100)}%`;
+  el("progress-fill").style.width = `${clamp(video.currentTime / duration * 100, 0, 100)}%`;
+  el("power-value").textContent = `${Math.round(power / 5 * 100)}%`;
+  el("brake-value").textContent = `${Math.round(brake / 4 * 100)}%`;
+  el("rpm-value").textContent = Math.round(rpm);
+  el("time-value").textContent = fmt(video.currentTime);
+  updateRoute();
+  updateAudio();
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.08, (now - last) / 1000);
+  last = now;
+  updateMotion(dt);
+  updateMeters();
+  requestAnimationFrame(loop);
+}
+
+function startAudio() {
+  if (audioReady) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    engineOsc = audioCtx.createOscillator();
+    engineGain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    engineOsc.type = "sawtooth";
+    engineOsc.frequency.value = 42;
+    filter.type = "lowpass";
+    filter.frequency.value = 260;
+    engineGain.gain.value = 0.025;
+    engineOsc.connect(filter);
+    filter.connect(engineGain);
+    engineGain.connect(audioCtx.destination);
+    engineOsc.start();
+    audioReady = true;
+  } catch (_) {}
+}
+
+function updateAudio() {
+  if (!audioReady) return;
+  const t = audioCtx.currentTime;
+  engineOsc.frequency.setTargetAtTime(34 + speed * 1.1 + power * 8, t, 0.18);
+  engineGain.gain.setTargetAtTime(speed > 1 ? 0.018 + power * 0.006 : 0.006, t, 0.2);
+}
+
+document.querySelectorAll("[data-power]").forEach(btn => btn.addEventListener("click", () => setPower(Number(btn.dataset.power))));
+document.querySelectorAll("[data-brake]").forEach(btn => btn.addEventListener("click", () => setBrake(Number(btn.dataset.brake))));
+el("auto-stop").addEventListener("click", () => {
+  autoStop = !autoStop;
+  el("auto-stop").classList.toggle("on", autoStop);
+  el("auto-stop").textContent = `自動停車 ${autoStop ? "ON" : "OFF"}`;
+});
+el("info-switch").addEventListener("click", () => {
+  infoOn = !infoOn;
+  el("info-switch").classList.toggle("on", infoOn);
+  el("info-switch").textContent = `駅情報 ${infoOn ? "ON" : "OFF"}`;
+  el("station-plate").classList.toggle("visible", infoOn && stopping);
+});
+el("video-file").addEventListener("change", event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  video.src = URL.createObjectURL(file);
+  video.load();
+  toast("選択した動画を読み込みました");
+});
+video.addEventListener("loadedmetadata", () => {
+  if (Number.isFinite(video.duration) && video.duration > 30) {
+    timingScale = 1;
+    toast("実測した駅停車タイミングを読み込みました");
+  }
+});
+el("start-run").addEventListener("click", () => {
+  el("start").style.display = "none";
+  startAudio();
+  setBrake(1);
+  showStation(stations[0]);
+  triggerStop(0);
+  requestAnimationFrame(loop);
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "ArrowUp") setPower(clamp(power + 1, 0, 5));
+  if (event.key === "ArrowDown") setBrake(clamp(brake + 1, 0, 4));
+  if (event.code === "Space") {
+    event.preventDefault();
+    setPower(0);
+    setBrake(0);
+  }
+});
+
+updateButtons();
+updateMeters();
+</script>
+</body>
+</html>
+
