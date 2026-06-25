@@ -265,7 +265,7 @@ button, input { font: inherit; }
 <body>
 <div id="app">
   <div id="view">
-    <video id="main-video" src="akayu_arato_constant_speed_mobile.mp4" preload="auto" muted playsinline webkit-playsinline></video>
+    <video id="main-video" src="akayu_arato_constant_speed_mobile.mp4?v=faststart-20260625" preload="auto" muted playsinline webkit-playsinline></video>
   </div>
 
   <div id="cab" aria-hidden="true">
@@ -365,6 +365,7 @@ video.defaultMuted = true;
 video.setAttribute("muted", "");
 video.setAttribute("playsinline", "");
 video.setAttribute("webkit-playsinline", "");
+const stableMobileVideo = window.matchMedia("(max-width: 760px), (pointer: coarse)").matches;
 const stations = [
   { name:"赤湯", kana:"あかゆ", arrival:0, stop:33, info:"JR奥羽本線・山形新幹線との接続駅。温泉地として知られ、フラワー長井線の旅の起点です。", spots:["赤湯温泉街", "烏帽子山公園", "南陽のワイン"] },
   { name:"南陽市役所", kana:"なんようしやくしょ", arrival:76, stop:18, info:"市役所に近い駅で、赤湯市街地から宮内方面へ進む区間の入口です。", spots:["南陽市役所", "赤湯温泉周辺", "市街地散策"] },
@@ -403,7 +404,6 @@ let lastVideoClock = 0;
 let videoStallTime = 0;
 let lastStallNudge = 0;
 let lastPlayAttempt = 0;
-let manualVideoAdvance = 0;
 
 const el = id => document.getElementById(id);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -538,10 +538,11 @@ function updateMotion(dt) {
   speed = clamp(speed + accel * dt, 0, 80);
   if (brake >= 4) speed = clamp(speed - 18 * dt, 0, 80);
   const rateFromSpeed = speed > 1 ? clamp(speed / 40, 0.45, 2.2) : 0.12;
-  video.playbackRate = speed > 1 ? rateFromSpeed : 0.12;
+  const playbackRate = stableMobileVideo ? clamp(rateFromSpeed, 0.65, 1.0) : rateFromSpeed;
+  video.playbackRate = speed > 1 ? playbackRate : 0.12;
   if (speed < 0.5 && power === 0 && brake === 0) video.pause();
   else if (video.paused) safePlay("走行時");
-  driveVideoIfStalled(dt, rateFromSpeed);
+  driveVideoIfStalled(dt);
 
   el("status-main").textContent = brake > 0 ? "制動中" : power > 0 ? "力行中" : "惰行中";
   el("status-sub").textContent = `ノッチ ${power} / ブレーキ ${brake}`;
@@ -557,11 +558,10 @@ function updateMotion(dt) {
   }
 }
 
-function driveVideoIfStalled(dt, targetRate) {
+function driveVideoIfStalled(dt) {
   if (stopping || speed <= 1 || !Number.isFinite(video.duration)) {
     lastVideoClock = video.currentTime;
     videoStallTime = 0;
-    manualVideoAdvance = 0;
     return;
   }
 
@@ -574,7 +574,6 @@ function driveVideoIfStalled(dt, targetRate) {
   if (!video.paused && delta > 0.01) {
     videoStallTime = 0;
     lastStallNudge = 0;
-    manualVideoAdvance = 0;
     lastVideoClock = video.currentTime;
     return;
   }
@@ -583,12 +582,10 @@ function driveVideoIfStalled(dt, targetRate) {
   if (videoStallTime > 0.18) {
     if (video.paused) safePlay("再開時");
   }
-  if (videoStallTime > 0.12 && video.readyState >= 1) {
-    manualVideoAdvance += targetRate * dt;
+  if (videoStallTime > 0.8 && video.readyState >= 2) {
     lastStallNudge += dt;
-    if (lastStallNudge > 0.09 || manualVideoAdvance > 0.16) {
-      video.currentTime = clamp(video.currentTime + Math.max(0.08, manualVideoAdvance), 0, video.duration);
-      manualVideoAdvance = 0;
+    if (lastStallNudge > 1.2) {
+      video.currentTime = clamp(video.currentTime + 0.04, 0, video.duration);
       lastStallNudge = 0;
     }
   }
