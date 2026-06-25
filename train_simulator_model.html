@@ -248,7 +248,7 @@ button, input { font: inherit; }
 <body>
 <div id="app">
   <div id="view">
-    <video id="main-video" src="akayu_arato_constant_speed_mobile.mp4" preload="auto" playsinline></video>
+    <video id="main-video" src="akayu_arato_constant_speed_mobile.mp4" preload="auto" muted playsinline webkit-playsinline></video>
   </div>
 
   <div id="cab" aria-hidden="true">
@@ -336,12 +336,18 @@ button, input { font: inherit; }
     <div id="help">
       <div><kbd>↑</kbd> 力行を上げる　<kbd>↓</kbd> ブレーキを上げる　<kbd>Space</kbd> ノッチオフ/緩解</div>
       <div>停車中はブレーキを緩解し、力行を入れると早めに発車できます。</div>
+      <div>スマホでは動画をミュート再生します。再生されない場合は、同じフォルダーに動画ファイルがあるか確認してください。</div>
     </div>
   </div>
 </div>
 
 <script>
 const video = document.getElementById("main-video");
+video.muted = true;
+video.defaultMuted = true;
+video.setAttribute("muted", "");
+video.setAttribute("playsinline", "");
+video.setAttribute("webkit-playsinline", "");
 const stations = [
   { name:"赤湯", kana:"あかゆ", arrival:0, stop:33, info:"JR奥羽本線・山形新幹線との接続駅。温泉地として知られ、フラワー長井線の旅の起点です。", spots:["赤湯温泉街", "烏帽子山公園", "南陽のワイン"] },
   { name:"南陽市役所", kana:"なんようしやくしょ", arrival:76, stop:18, info:"市役所に近い駅で、赤湯市街地から宮内方面へ進む区間の入口です。", spots:["南陽市役所", "赤湯温泉周辺", "市街地散策"] },
@@ -379,6 +385,7 @@ let audioCtx, engineOsc, engineGain;
 let lastVideoClock = 0;
 let videoStallTime = 0;
 let lastStallNudge = 0;
+let lastPlayAttempt = 0;
 
 const el = id => document.getElementById(id);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -394,6 +401,19 @@ function toast(text) {
   t.classList.add("visible");
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => t.classList.remove("visible"), 1800);
+}
+
+function safePlay(reason) {
+  const now = performance.now();
+  if (now - lastPlayAttempt < 900) return;
+  lastPlayAttempt = now;
+  video.muted = true;
+  const playResult = video.play();
+  if (playResult && typeof playResult.catch === "function") {
+    playResult.catch(() => {
+      toast(`${reason}の動画再生が止められました。画面をタップして再開してください`);
+    });
+  }
 }
 
 function setPower(n) {
@@ -470,7 +490,7 @@ function depart() {
   el("status-main").textContent = "走行中";
   lastVideoClock = video.currentTime;
   videoStallTime = 0;
-  video.play().catch(() => {});
+  safePlay("発車時");
   toast("発車");
 }
 
@@ -502,7 +522,7 @@ function updateMotion(dt) {
   const rateFromSpeed = speed > 1 ? clamp(speed / 40, 0.45, 2.2) : 0.12;
   video.playbackRate = speed > 1 ? rateFromSpeed : 0.12;
   if (speed < 0.5 && power === 0 && brake === 0) video.pause();
-  else if (video.paused) video.play().catch(() => {});
+  else if (video.paused) safePlay("走行時");
   driveVideoIfStalled(dt, rateFromSpeed);
 
   el("status-main").textContent = brake > 0 ? "制動中" : power > 0 ? "力行中" : "惰行中";
@@ -541,7 +561,7 @@ function driveVideoIfStalled(dt, targetRate) {
 
   videoStallTime += dt;
   if (videoStallTime > 0.18) {
-    if (video.paused) video.play().catch(() => {});
+    if (video.paused) safePlay("再開時");
   }
   if (videoStallTime > 0.35 && video.readyState >= 1) {
     lastStallNudge += dt;
@@ -633,6 +653,9 @@ video.addEventListener("loadedmetadata", () => {
 });
 el("start-run").addEventListener("click", () => {
   el("start").style.display = "none";
+  video.muted = true;
+  if (video.readyState === 0) video.load();
+  safePlay("起動時");
   startAudio();
   setBrake(1);
   showStation(stations[0]);
