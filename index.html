@@ -228,19 +228,36 @@ button, input { font: inherit; }
 #toast.visible { opacity: 1; }
 
 @media (max-width: 760px) {
-  #hud { left: 10px; right: 10px; grid-template-columns: auto 1fr; }
+  #hud { top: max(8px, env(safe-area-inset-top)); left: 10px; right: 10px; grid-template-columns: auto 1fr; gap: 8px; }
   #status-card { display: none; }
+  #speed-card { min-width: 116px; padding: 7px 10px; }
   #route-card { grid-column: 1 / -1; }
-  #station-plate { width: calc(100vw - 28px); bottom: 178px; height: 38vh; }
-  #controls { left: 10px; right: 10px; height: 164px; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #station-plate { width: calc(100vw - 28px); bottom: calc(292px + env(safe-area-inset-bottom)); height: 31vh; }
+  #controls {
+    left: 10px;
+    right: 10px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    height: 214px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 96px 110px;
+    gap: 8px;
+  }
   #center-console { grid-column: 1 / -1; order: -1; }
-  .console { padding: 8px; }
+  .console { min-height: 0; overflow: hidden; padding: 8px; }
+  .console-title { margin-bottom: 6px; }
+  .lever-row { gap: 6px; }
+  .lever { width: clamp(38px, 11vw, 46px); height: 40px; border-radius: 7px; }
+  .wide { min-width: 50px; padding: 0 8px; }
+  #meters { gap: 5px; }
+  .meter { grid-template-columns: 54px 1fr 40px; gap: 6px; }
+  #switches { gap: 6px; margin-top: 6px; }
+  .switch { padding: 7px; }
   .post { width: 22px; }
   #view {
     top: 106px;
     left: 22px;
     right: 22px;
-    bottom: 180px;
+    bottom: calc(296px + env(safe-area-inset-bottom));
   }
 }
 </style>
