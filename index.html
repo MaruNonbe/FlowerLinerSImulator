@@ -232,14 +232,14 @@ button, input { font: inherit; }
   #status-card { display: none; }
   #speed-card { min-width: 116px; padding: 7px 10px; }
   #route-card { grid-column: 1 / -1; }
-  #station-plate { width: calc(100vw - 28px); bottom: calc(292px + env(safe-area-inset-bottom)); height: 31vh; }
+  #station-plate { width: calc(100vw - 28px); bottom: calc(354px + env(safe-area-inset-bottom)); height: 25vh; }
   #controls {
     left: 10px;
     right: 10px;
     bottom: calc(74px + env(safe-area-inset-bottom));
-    height: 214px;
+    height: 272px;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 96px 110px;
+    grid-template-rows: 112px 152px;
     gap: 8px;
   }
   #center-console { grid-column: 1 / -1; order: -1; }
@@ -257,7 +257,7 @@ button, input { font: inherit; }
     top: 106px;
     left: 22px;
     right: 22px;
-    bottom: calc(296px + env(safe-area-inset-bottom));
+    bottom: calc(354px + env(safe-area-inset-bottom));
   }
 }
 </style>
@@ -403,6 +403,7 @@ let lastVideoClock = 0;
 let videoStallTime = 0;
 let lastStallNudge = 0;
 let lastPlayAttempt = 0;
+let manualVideoAdvance = 0;
 
 const el = id => document.getElementById(id);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -560,6 +561,7 @@ function driveVideoIfStalled(dt, targetRate) {
   if (stopping || speed <= 1 || !Number.isFinite(video.duration)) {
     lastVideoClock = video.currentTime;
     videoStallTime = 0;
+    manualVideoAdvance = 0;
     return;
   }
 
@@ -572,6 +574,7 @@ function driveVideoIfStalled(dt, targetRate) {
   if (!video.paused && delta > 0.01) {
     videoStallTime = 0;
     lastStallNudge = 0;
+    manualVideoAdvance = 0;
     lastVideoClock = video.currentTime;
     return;
   }
@@ -580,10 +583,12 @@ function driveVideoIfStalled(dt, targetRate) {
   if (videoStallTime > 0.18) {
     if (video.paused) safePlay("再開時");
   }
-  if (videoStallTime > 0.35 && video.readyState >= 1) {
+  if (videoStallTime > 0.12 && video.readyState >= 1) {
+    manualVideoAdvance += targetRate * dt;
     lastStallNudge += dt;
-    if (lastStallNudge > 0.18) {
-      video.currentTime = clamp(video.currentTime + Math.max(0.12, targetRate * dt * 2), 0, video.duration);
+    if (lastStallNudge > 0.09 || manualVideoAdvance > 0.16) {
+      video.currentTime = clamp(video.currentTime + Math.max(0.08, manualVideoAdvance), 0, video.duration);
+      manualVideoAdvance = 0;
       lastStallNudge = 0;
     }
   }
