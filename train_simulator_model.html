@@ -104,7 +104,7 @@ button, input { font: inherit; }
   box-shadow: 0 22px 60px rgba(0,0,0,0.5);
   transition: opacity .35s ease, transform .35s ease;
 }
-#station-plate.visible { opacity: 1; transform: translate(-50%, 0); }
+#station-plate.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #plate-head {
   display: flex;
   justify-content: space-between;
@@ -123,6 +123,21 @@ button, input { font: inherit; }
 .plate-section h3 { margin: 0 0 7px; color: var(--green); font-size: 13px; letter-spacing: .12em; }
 .plate-section p, .plate-section li { color: var(--text); font-size: clamp(13px, 1.7vw, 16px); }
 .plate-section ul { padding-left: 1.2em; margin: 0; }
+.plate-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.info-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(56,242,127,0.72);
+  border-radius: 7px;
+  color: var(--green);
+  background: rgba(56,242,127,0.08);
+  padding: 7px 11px;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.info-link.secondary { border-color: rgba(255,255,255,0.28); color: var(--text); background: rgba(255,255,255,0.06); }
 @keyframes scrollInfo { from { top: 100%; } to { top: -145%; } }
 
 #controls {
@@ -369,24 +384,51 @@ video.setAttribute("muted", "");
 video.setAttribute("playsinline", "");
 video.setAttribute("webkit-playsinline", "");
 const stableMobileVideo = window.matchMedia("(max-width: 760px), (pointer: coarse)").matches;
+const municipalities = {
+  nanyo: {
+    name: "南陽市",
+    history: "赤湯・宮内・和郷の各地域を背景に、温泉、果樹、ワイン、熊野大社などの歴史文化を持つ置賜地方の自治体です。",
+    officialUrl: "http://www.city.nanyo.yamagata.jp/",
+    eventUrl: "http://www.city.nanyo.yamagata.jp/"
+  },
+  kawanishi: {
+    name: "川西町",
+    history: "置賜盆地の中央部に位置し、農業、花、里山文化、米沢街道沿いの歴史を持つ町です。西大塚周辺は長井線と地域交通の接点でもあります。",
+    officialUrl: "https://www.town.kawanishi.yamagata.jp/",
+    eventUrl: "https://www.town.kawanishi.yamagata.jp/"
+  },
+  nagai: {
+    name: "長井市",
+    history: "最上川舟運や商業で栄えた歴史を持ち、水路のある町並み、あやめ公園、けん玉文化などが知られる自治体です。",
+    officialUrl: "https://www.city.nagai.yamagata.jp/",
+    eventUrl: "https://www.city.nagai.yamagata.jp/"
+  },
+  shirataka: {
+    name: "白鷹町",
+    history: "最上川と里山に沿って発展した町で、紅花文化、鮎、深山和紙、荒砥周辺の町場など、自然と手仕事の魅力があります。",
+    officialUrl: "https://www.town.shirataka.lg.jp/",
+    eventUrl: "https://www.town.shirataka.lg.jp/"
+  }
+};
+
 const stations = [
-  { name:"赤湯", kana:"あかゆ", arrival:0, stop:33, info:"JR奥羽本線・山形新幹線との接続駅。温泉地として知られ、フラワー長井線の旅の起点です。", spots:["赤湯温泉街", "烏帽子山公園", "南陽のワイン"] },
-  { name:"南陽市役所", kana:"なんようしやくしょ", arrival:76, stop:18, info:"市役所に近い駅で、赤湯市街地から宮内方面へ進む区間の入口です。", spots:["南陽市役所", "赤湯温泉周辺", "市街地散策"] },
-  { name:"宮内", kana:"みやうち", arrival:178, stop:59, info:"熊野大社の門前町として知られるエリア。沿線でも生活感のある大きな駅です。", spots:["熊野大社", "双松公園", "宮内商店街"] },
-  { name:"おりはた", kana:"おりはた", arrival:221, stop:15, info:"田園と集落の景色が広がる静かな駅。車窓には置賜盆地らしい風景が続きます。", spots:["田園風景", "里山の眺め"] },
-  { name:"梨郷", kana:"りんごう", arrival:260, stop:3, info:"短い停車で通過感のある小駅。沿線の農地と集落の距離感が近い区間です。", spots:["果樹園", "置賜盆地の田園"] },
-  { name:"西大塚", kana:"にしおおつか", arrival:325, stop:4, info:"素朴な木造駅舎が印象的な駅。ローカル線らしい佇まいを楽しめます。", spots:["歴史ある駅舎", "農村風景"] },
-  { name:"今泉", kana:"いまいずみ", arrival:378, stop:11, info:"JR米坂線との接続駅。長井線の中でも交通の節点となる場所です。", spots:["JR米坂線接続", "白川周辺", "駅前散策"] },
-  { name:"時庭", kana:"ときにわ", arrival:594, stop:34, info:"長井市南部の田園地帯にある駅。穏やかな直線区間の風景が続きます。", spots:["田園風景", "最上川水系の眺め"] },
-  { name:"南長井", kana:"みなみながい", arrival:810, stop:99, info:"長井市街地の南側に位置し、住宅地と田畑が混ざる風景に変わっていきます。", spots:["長井市街地南部", "水路のある町並み"] },
-  { name:"長井", kana:"ながい", arrival:834, stop:18, info:"フラワー長井線の中心駅。長井市の観光や街歩きの拠点になります。", spots:["長井市中心部", "長井あやめ公園", "けん玉文化"] },
-  { name:"あやめ公園", kana:"あやめこうえん", arrival:853, stop:2, info:"あやめ公園の最寄り駅。季節には花の名所として知られます。", spots:["長井あやめ公園", "花の散策路"] },
-  { name:"羽前成田", kana:"うぜんなりた", arrival:886, stop:3, info:"長井市北部の集落にある駅。沿線の暮らしを近くに感じる区間です。", spots:["成田地区", "田園と住宅地"] },
-  { name:"白兎", kana:"しろうさぎ", arrival:928, stop:4, info:"名前が印象的な駅。周辺は静かな田園地帯で、車窓の開放感があります。", spots:["白兎地区", "田園風景"] },
-  { name:"蚕桑", kana:"こぐわ", arrival:966, stop:4, info:"白鷹町へ近づく区間の駅。山並みが近くなり、景色の表情が変わります。", spots:["白鷹町の田園", "里山の景色"] },
-  { name:"鮎貝", kana:"あゆかい", arrival:1055, stop:10, info:"最上川に近い白鷹町の駅。終点荒砥へ向けて、川と山の気配が濃くなります。", spots:["鮎貝地区", "最上川周辺"] },
-  { name:"四季の郷", kana:"しきのさと", arrival:1088, stop:10, info:"名前どおり季節感のある風景が楽しめる駅。終点まであと少しです。", spots:["四季の郷周辺", "白鷹町の自然"] },
-  { name:"荒砥", kana:"あらと", arrival:1209, stop:60, info:"フラワー長井線の終点。白鷹町の中心部に近く、旅の終着駅です。", spots:["白鷹町中心部", "最上川", "荒砥駅前"] }
+  { name:"赤湯", kana:"あかゆ", municipality:"nanyo", arrival:0, stop:33, info:"JR奥羽本線・山形新幹線との接続駅。温泉地として知られ、フラワー長井線の旅の起点です。", stationHistory:"奥羽本線の駅として発展し、現在は山形新幹線とフラワー長井線が接続する南陽市の玄関口です。", spots:["赤湯温泉街", "烏帽子山公園", "南陽のワイン"] },
+  { name:"南陽市役所", kana:"なんようしやくしょ", municipality:"nanyo", arrival:76, stop:18, info:"市役所に近い駅で、赤湯市街地から宮内方面へ進む区間の入口です。", stationHistory:"市役所周辺へのアクセスを担う駅として設けられ、行政施設と市街地を結ぶ利用に適した駅です。", spots:["南陽市役所", "赤湯温泉周辺", "市街地散策"] },
+  { name:"宮内", kana:"みやうち", municipality:"nanyo", arrival:178, stop:59, info:"熊野大社の門前町として知られるエリア。沿線でも生活感のある大きな駅です。", stationHistory:"熊野大社の門前町・宮内地区を支える駅で、通勤通学と観光利用の両面で地域に親しまれています。", spots:["熊野大社", "双松公園", "宮内商店街"] },
+  { name:"おりはた", kana:"おりはた", municipality:"nanyo", arrival:221, stop:15, info:"田園と集落の景色が広がる静かな駅。車窓には置賜盆地らしい風景が続きます。", stationHistory:"宮内地区と梨郷方面の間にある小駅で、田園集落の日常に寄り添う停車場として使われてきました。", spots:["田園風景", "里山の眺め"] },
+  { name:"梨郷", kana:"りんごう", municipality:"nanyo", arrival:260, stop:3, info:"短い停車で通過感のある小駅。沿線の農地と集落の距離感が近い区間です。", stationHistory:"梨郷地区の生活駅として設けられ、置賜盆地の農村風景の中にある長井線らしい駅です。", spots:["果樹園", "置賜盆地の田園"] },
+  { name:"西大塚", kana:"にしおおつか", municipality:"kawanishi", arrival:325, stop:4, info:"素朴な木造駅舎が印象的な駅。ローカル線らしい佇まいを楽しめます。", stationHistory:"川西町側の長井線駅で、木造駅舎の雰囲気と農村集落の景観が残る駅として知られます。", spots:["歴史ある駅舎", "農村風景"] },
+  { name:"今泉", kana:"いまいずみ", municipality:"nagai", arrival:378, stop:11, info:"JR米坂線との接続駅。長井線の中でも交通の節点となる場所です。", stationHistory:"JR米坂線との接続駅として、置賜地方の鉄道交通を結ぶ重要な役割を担ってきました。", spots:["JR米坂線接続", "白川周辺", "駅前散策"] },
+  { name:"時庭", kana:"ときにわ", municipality:"nagai", arrival:594, stop:34, info:"長井市南部の田園地帯にある駅。穏やかな直線区間の風景が続きます。", stationHistory:"長井市南部の集落と田園地帯を支える駅で、通学や地域利用に寄り添う停車場です。", spots:["田園風景", "最上川水系の眺め"] },
+  { name:"南長井", kana:"みなみながい", municipality:"nagai", arrival:810, stop:99, info:"長井市街地の南側に位置し、住宅地と田畑が混ざる風景に変わっていきます。", stationHistory:"長井市街地南部の生活圏に近い駅で、住宅地と田園の境目にある利用しやすい駅です。", spots:["長井市街地南部", "水路のある町並み"] },
+  { name:"長井", kana:"ながい", municipality:"nagai", arrival:834, stop:18, info:"フラワー長井線の中心駅。長井市の観光や街歩きの拠点になります。", stationHistory:"長井線の中心的な駅として、長井市中心部の交通、観光、街歩きの拠点になっています。", spots:["長井市中心部", "長井あやめ公園", "けん玉文化"] },
+  { name:"あやめ公園", kana:"あやめこうえん", municipality:"nagai", arrival:853, stop:2, info:"あやめ公園の最寄り駅。季節には花の名所として知られます。", stationHistory:"長井あやめ公園へのアクセス駅として、花の季節の観光利用を意識した駅です。", spots:["長井あやめ公園", "花の散策路"] },
+  { name:"羽前成田", kana:"うぜんなりた", municipality:"nagai", arrival:886, stop:3, info:"長井市北部の集落にある駅。沿線の暮らしを近くに感じる区間です。", stationHistory:"成田地区の生活に根ざした駅で、長井市北部の集落と市街地を結んできました。", spots:["成田地区", "田園と住宅地"] },
+  { name:"白兎", kana:"しろうさぎ", municipality:"nagai", arrival:928, stop:4, info:"名前が印象的な駅。周辺は静かな田園地帯で、車窓の開放感があります。", stationHistory:"白兎地区の小駅として、印象的な駅名と田園風景が沿線の個性になっています。", spots:["白兎地区", "田園風景"] },
+  { name:"蚕桑", kana:"こぐわ", municipality:"shirataka", arrival:966, stop:4, info:"白鷹町へ近づく区間の駅。山並みが近くなり、景色の表情が変わります。", stationHistory:"白鷹町南部の入口にあたる駅で、かつて養蚕が地域産業だった時代の地名を今に伝えます。", spots:["白鷹町の田園", "里山の景色"] },
+  { name:"鮎貝", kana:"あゆかい", municipality:"shirataka", arrival:1055, stop:10, info:"最上川に近い白鷹町の駅。終点荒砥へ向けて、川と山の気配が濃くなります。", stationHistory:"鮎貝地区の中心に近い駅で、最上川沿いの暮らしと白鷹町の町場をつなぐ役割を持ちます。", spots:["鮎貝地区", "最上川周辺"] },
+  { name:"四季の郷", kana:"しきのさと", municipality:"shirataka", arrival:1088, stop:10, info:"名前どおり季節感のある風景が楽しめる駅。終点まであと少しです。", stationHistory:"白鷹町の自然や季節感を感じさせる駅名を持ち、終点荒砥へ向かう旅の終盤を印象づけます。", spots:["四季の郷周辺", "白鷹町の自然"] },
+  { name:"荒砥", kana:"あらと", municipality:"shirataka", arrival:1209, stop:60, info:"フラワー長井線の終点。白鷹町の中心部に近く、旅の終着駅です。", stationHistory:"フラワー長井線の終着駅で、白鷹町中心部への玄関口として地域交通と観光の結節点になっています。", spots:["白鷹町中心部", "最上川", "荒砥駅前"] }
 ];
 
 let power = 0;
@@ -456,11 +498,22 @@ function updateButtons() {
 }
 
 function showStation(station) {
+  const municipality = municipalities[station.municipality];
   el("plate-title").textContent = station.name;
   el("plate-kana").textContent = station.kana;
   el("plate-stop-time").textContent = `停車 ${station.stop}秒`;
   el("plate-scroll").innerHTML = `
     <div class="plate-section"><h3>駅周辺情報</h3><p>${station.info}</p></div>
+    <div class="plate-section"><h3>駅の沿革</h3><p>${station.stationHistory}</p></div>
+    <div class="plate-section"><h3>${municipality.name}の概要</h3><p>${municipality.history}</p></div>
+    <div class="plate-section">
+      <h3>イベント・公式情報</h3>
+      <p>本日のイベントや最新情報は、自治体の公式ページで確認できます。</p>
+      <div class="plate-links">
+        <a class="info-link" href="${municipality.eventUrl}" target="_blank" rel="noopener noreferrer">イベントを見る</a>
+        <a class="info-link secondary" href="${municipality.officialUrl}" target="_blank" rel="noopener noreferrer">${municipality.name}公式サイト</a>
+      </div>
+    </div>
     <div class="plate-section"><h3>見どころ</h3><ul>${station.spots.map(s => `<li>${s}</li>`).join("")}</ul></div>
     <div class="plate-section"><h3>運転メモ</h3><p>発車時はブレーキを緩解し、力行1からゆっくり加速してください。停車中は速度計が0km/hになります。</p></div>
   `;
